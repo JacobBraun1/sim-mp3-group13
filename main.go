@@ -317,50 +317,59 @@ func Issue() {
 // // unconditionally transition to the ID state (models the 1 cycle
 // // latency for instruction fetch).
 func Dispatch() {
-	printTask("Dispatch")
 
-	if dispatch_list.Len() > 0 {
-		temp_list := []*instruction{}
+  printTask("Dispatch")
 
-		for e := dispatch_list.Front(); e != nil; e = e.Next() {
-			i := e.Value.(*instruction)
-			switch i.iTypeState {
-			case iTypeIF:
-				i.incrementStage() // IF -> ID  (models the 1 cycle latency for instruction fetch)
-				i.printInstruction("Dispatch IF -> ID")
-			case iTypeID:
-				temp_list = append(temp_list, e.Value.(*instruction))
-			}
-		}
+  if dispatch_list.Len() > 0 {
+    temp_list := []*instruction{}
 
-		// Scan the temp list in ascending order of tags
-		sort.SliceStable(temp_list, func(i, j int) bool {
-			return temp_list[i].tag < temp_list[j].tag
-		})
-		for _, i := range temp_list {
-			if issue_list.Len() >= SchedulingQueueSize {
-				i.printInstruction("Dispatch stalled")
-				continue
-			}
-			// if the scheduling queue is not full, then:
-			i.incrementStage() // ID -> IS
+    for e := dispatch_list.Front(); e != nil; e = e.Next() {
+      i := e.Value.(*instruction)
 
-			//TODO
-			// // 3) Rename source operands by looking up state in the register file;
-			// //    Rename destination by updating state in the register file.
+      switch i.iTypeState {
+      case iTypeIF:
+        i.incrementStage() // IF -> ID (models the 1 cycle latency for instruction fetch)
+        i.printInstruction("Dispatch IF -> ID")
 
-			i.printInstruction("Dispatch ID -> IS")
+      case iTypeID:
+        temp_list = append(temp_list, e.Value.(*instruction))
+      }
+    }
+	// Scan the temp list in ascending order of tags
+    sort.SliceStable(temp_list, func(i, j int) bool {
+      return temp_list[i].tag < temp_list[j].tag 
+    })
 
-			//1) Remove the instruction from the dispatch_list and add it to the issue_list.
-			issue_list.PushBack(i)
-			for d := dispatch_list.Front(); d != nil; d = d.Next() {
-				if d.Value == i {
-					dispatch_list.Remove(d)
-				}
-			}
-		}
-	}
+    for _, i := range temp_list {
+      
+      if issue_list.Len() >= SchedulingQueueSize {
+        i.printInstruction("Dispatch stalled")
+        continue 
+      }
+      
+      // Rename source registers
+      i.src1Reg = registers[i.src1Reg]  
+      i.src2Reg = registers[i.src2Reg]
+
+      // Rename destination register 
+      registers[i.destReg] = -1 
+	  // if the scheduling queue is not full, then:
+      i.incrementStage() // ID -> IS
+
+      i.printInstruction("Dispatch ID -> IS")
+
+	  //1) Remove the instruction from the dispatch_list and add it to the issue_list.
+      issue_list.PushBack(i)
+      for d := dispatch_list.Front(); d != nil; d = d.Next() {
+        if d.Value == i {
+          dispatch_list.Remove(d)
+        }
+      }
+    }
+  }
 }
+
+
 
 // Fetch();
 // // Read new instructions from the trace as long as
